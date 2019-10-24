@@ -1,0 +1,5 @@
+
+dependencies {
+	implementation project( ':mp-config-ext-api' )
+	implementation project( ':mp-config-ext-util' )
+}

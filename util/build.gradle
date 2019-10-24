@@ -1,0 +1,10 @@
+
+dependencies {
+	compileOnly 'jakarta.enterprise:jakarta.enterprise.cdi-api'
+
+	implementation 'org.slf4j:slf4j-api'
+}
+
+apply from: rootProject.file( 'publish.gradle' )
+apply from: rootProject.file( 'bintray.gradle' )
+

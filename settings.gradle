@@ -1,0 +1,19 @@
+rootProject.name = 'mp-config-ext'
+
+include 'api'
+include 'cdi'
+include 'jmx'
+include 'util'
+include 'yml'
+
+def renameChildren( ProjectDescriptor desc ) {
+	desc.children.each { child ->
+		child.name = "${rootProject.name}-${child.path.substring(1).replace(':', '-')}"
+
+		renameChildren child
+	}
+}
+
+renameChildren rootProject
+
+apply from: 'composite.gradle'

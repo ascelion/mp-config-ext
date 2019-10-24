@@ -1,0 +1,12 @@
+
+dependencies {
+	implementation project( ':mp-config-ext-api' )
+	implementation project( ':mp-config-ext-util' )
+
+	implementation 'org.yaml:snakeyaml'
+	implementation 'org.apache.commons:commons-text'
+}
+
+apply from: rootProject.file( 'publish.gradle' )
+apply from: rootProject.file( 'bintray.gradle' )
+

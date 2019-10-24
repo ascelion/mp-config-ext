@@ -1,0 +1,22 @@
+
+dependencies {
+	implementation project( ':mp-config-ext-api' )
+	implementation project( ':mp-config-ext-util' )
+
+	compileOnly 'jakarta.enterprise:jakarta.enterprise.cdi-api'
+
+	implementation 'ascelion.public:cdi-utils'
+	implementation 'org.slf4j:slf4j-api'
+	implementation 'org.apache.commons:commons-text'
+
+	testImplementation 'org.yaml:snakeyaml'
+	testImplementation 'org.jboss.weld:weld-junit4'
+	testImplementation 'ch.qos.logback:logback-classic'
+
+	testImplementation 'io.smallrye:smallrye-config'
+	//	testImplementation 'org.apache.geronimo.config:geronimo-config-impl'
+}
+
+apply from: rootProject.file( 'publish.gradle' )
+apply from: rootProject.file( 'bintray.gradle' )
+

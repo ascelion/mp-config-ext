@@ -1,5 +1,7 @@
 package ascelion.microprofile.config.cdi;
 
+import java.util.Optional;
+
 import javax.enterprise.inject.Produces;
 import javax.enterprise.inject.spi.InjectionPoint;
 import javax.inject.Inject;
@@ -16,14 +18,16 @@ class ConfigValueProd {
 	@ConfigValue("")
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	Object produceType(InjectionPoint ijp) {
-		final ConfigValue cval = ijp.getAnnotated().getAnnotation(ConfigValue.class);
+		final ConfigValue annotation = ijp.getAnnotated().getAnnotation(ConfigValue.class);
+		final String property = annotation.value();
 		final Class type = (Class<?>) ijp.getType();
-		final String prop = cval.value();
 
-		if (cval.required()) {
-			return this.config.getValue(prop, type);
+		if (type == Optional.class) {
+			return this.config.getOptionalValue(property, type);
+		} else if (annotation.required()) {
+			return this.config.getValue(property, type);
 		} else {
-			return this.config.getOptionalValue(prop, type)
+			return this.config.getOptionalValue(property, type)
 					.orElseGet(() -> Primitives.toDefault(type));
 		}
 	}

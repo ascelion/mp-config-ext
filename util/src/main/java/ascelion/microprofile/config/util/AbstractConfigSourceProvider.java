@@ -2,7 +2,6 @@ package ascelion.microprofile.config.util;
 
 import static java.util.Collections.emptyList;
 
-import org.eclipse.microprofile.config.Config;
 import org.eclipse.microprofile.config.spi.ConfigSource;
 import org.eclipse.microprofile.config.spi.ConfigSourceProvider;
 
@@ -14,8 +13,6 @@ public abstract class AbstractConfigSourceProvider implements ConfigSourceProvid
 			return false;
 		};
 	};
-
-	private Config config;
 
 	@Override
 	public Iterable<ConfigSource> getConfigSources(ClassLoader forClassLoader) {
@@ -29,22 +26,6 @@ public abstract class AbstractConfigSourceProvider implements ConfigSourceProvid
 			return configSources(forClassLoader);
 		} finally {
 			RECURSIVE.remove();
-		}
-	}
-
-	protected final Config config() {
-		if (this.config != null) {
-			return this.config;
-		}
-
-		synchronized (this) {
-			if (this.config != null) {
-				return this.config;
-			}
-
-			this.config = ConfigUtil.getConfig();
-
-			return this.config;
 		}
 	}
 

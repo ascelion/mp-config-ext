@@ -11,7 +11,7 @@ import org.jboss.weld.junit4.WeldInitiator;
 import org.junit.Rule;
 import org.junit.Test;
 
-public class ConfigSetTest {
+public class SetterTest {
 	static public class Bean {
 		boolean configureCalled;
 		boolean definedCalled;

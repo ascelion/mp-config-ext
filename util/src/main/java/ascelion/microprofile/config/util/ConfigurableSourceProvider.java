@@ -11,6 +11,7 @@ import java.util.stream.Stream;
 import static java.util.Arrays.stream;
 import static java.util.stream.Collectors.toList;
 
+import org.eclipse.microprofile.config.Config;
 import org.eclipse.microprofile.config.spi.ConfigSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,9 +24,10 @@ public abstract class ConfigurableSourceProvider extends AbstractConfigSourcePro
 
 	@Override
 	protected Iterable<ConfigSource> configSources(ClassLoader forClassLoader) {
-		final File directory = new File(config().getOptionalValue(DIRECTORY_PROP, String.class).orElse("."));
+		final Config config = ConfigInstance.get();
+		final File directory = new File(config.getOptionalValue(DIRECTORY_PROP, String.class).orElse("."));
 
-		return config()
+		return config
 //				 XXX Payara-5.193 doesn't support String[]
 //				.getOptionalValue(RESOURCE_PROP, String[].class)
 //				.map(Stream::of)

@@ -1,18 +1,21 @@
 package ascelion.microprofile.config.cdi;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import ascelion.microprofile.config.eval.Expression;
 import ascelion.microprofile.config.eval.ExpressionConfig;
 import ascelion.microprofile.config.util.AbstractConfigSource;
+import ascelion.microprofile.config.util.ConfigInstance;
 
 import static java.util.Collections.unmodifiableMap;
 import static java.util.Optional.ofNullable;
 import static java.util.stream.Collectors.toMap;
 import static org.apache.commons.lang3.StringUtils.trimToNull;
+
+import org.eclipse.microprofile.config.Config;
 
 public class ExpressionConfigSource extends AbstractConfigSource {
 	private ExpressionConfig expConfig;
@@ -25,13 +28,8 @@ public class ExpressionConfigSource extends AbstractConfigSource {
 	}
 
 	@Override
-	protected Set<String> propertyNames() {
-		return cache().keySet();
-	}
-
-	@Override
 	protected Map<String, String> properties() {
-		return remap(cache());
+		return remap(expConfig().isCached() ? cache() : readAll());
 	}
 
 	@Override
@@ -76,9 +74,22 @@ public class ExpressionConfigSource extends AbstractConfigSource {
 	}
 
 	String getStringValue(String propertyName, String defValue) {
-		return config()
+		final Config config = ConfigInstance.get();
+
+		return config
 				.getOptionalValue(propertyName, String.class)
 				.orElse(trimToNull(defValue));
+	}
+
+	private Map<String, Optional<String>> readAll() {
+		final Map<String, Optional<String>> props = new HashMap<>();
+		final Config config = ConfigInstance.get();
+
+		for (final String name : config.getPropertyNames()) {
+			props.put(name, config.getOptionalValue(name, String.class));
+		}
+
+		return props;
 	}
 
 	private ExpressionConfig expConfig() {
@@ -91,7 +102,7 @@ public class ExpressionConfigSource extends AbstractConfigSource {
 				return this.expConfig;
 			}
 
-			this.expConfig = new ExpressionConfig(config());
+			this.expConfig = new ExpressionConfig(ConfigInstance.get());
 
 			return this.expConfig;
 		}
@@ -129,11 +140,7 @@ public class ExpressionConfigSource extends AbstractConfigSource {
 				return this.cache;
 			}
 
-			this.cache = new ConcurrentHashMap<>();
-
-			for (final String name : config().getPropertyNames()) {
-				this.cache.put(name, config().getOptionalValue(name, String.class));
-			}
+			this.cache = new ConcurrentHashMap<>(readAll());
 
 			return this.cache;
 		}

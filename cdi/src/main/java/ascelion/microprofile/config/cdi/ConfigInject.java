@@ -85,7 +85,7 @@ final class ConfigInject<T> {
 				} else {
 					this.mod.executable(executable)
 							.remove(Inject.class)
-							.add(ConfigSet.INSTANCE);
+							.add(Setter.INSTANCE);
 
 					LOG.debug("Removing injection from setter in {}", executable);
 				}

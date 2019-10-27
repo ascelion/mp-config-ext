@@ -4,9 +4,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.TreeMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -35,7 +35,7 @@ class YMLConfigSource implements ConfigSource {
 	}
 
 	private final String name;
-	private final Map<String, String> properties = new TreeMap<>();
+	private final Map<String, String> properties = new HashMap<>();
 	@Getter
 	private final int ordinal;
 

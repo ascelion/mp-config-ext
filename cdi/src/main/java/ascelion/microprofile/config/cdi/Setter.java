@@ -10,9 +10,9 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 @Retention(RUNTIME)
 @Target(METHOD)
-public @interface ConfigSet {
-	class Literal extends AnnotationLiteral<ConfigSet> implements ConfigSet {
+@interface Setter {
+	class Literal extends AnnotationLiteral<Setter> implements Setter {
 	};
 
-	ConfigSet INSTANCE = new Literal();
+	Setter INSTANCE = new Literal();
 }

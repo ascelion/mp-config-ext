@@ -14,8 +14,8 @@ import org.eclipse.microprofile.config.Config;
 import org.eclipse.microprofile.config.ConfigProvider;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
-public final class ConfigUtil {
-	static public Config getConfig(BeanManager bm) {
+public final class ConfigInstance {
+	static public Config get(BeanManager bm) {
 		final Set<Bean<?>> beans;
 
 		try {
@@ -38,9 +38,9 @@ public final class ConfigUtil {
 		return (Config) bm.getReference(bean, Config.class, cc);
 	}
 
-	static public Config getConfig() {
+	static public Config get() {
 		try {
-			return getConfig(CDI.current().getBeanManager());
+			return get(CDI.current().getBeanManager());
 		} catch (final IllegalStateException e) {
 		}
 

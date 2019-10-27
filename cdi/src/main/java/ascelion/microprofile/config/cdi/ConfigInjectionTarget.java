@@ -13,7 +13,7 @@ import javax.enterprise.inject.spi.InjectionPoint;
 import javax.enterprise.inject.spi.InjectionTarget;
 
 import ascelion.microprofile.config.ConfigValue;
-import ascelion.microprofile.config.util.ConfigUtil;
+import ascelion.microprofile.config.util.ConfigInstance;
 
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -65,7 +65,7 @@ class ConfigInjectionTarget<T> implements InjectionTarget<T> {
 		final String prop = cval.value();
 		final Class<?> type = param.getJavaParameter().getType();
 
-		ConfigUtil.getConfig(this.bm)
+		ConfigInstance.get(this.bm)
 				.getOptionalValue(prop, type)
 				.ifPresent(value -> {
 					try {

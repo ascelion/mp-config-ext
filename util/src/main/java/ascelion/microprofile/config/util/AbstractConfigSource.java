@@ -9,7 +9,6 @@ import static java.util.Arrays.asList;
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.emptySet;
 
-import org.eclipse.microprofile.config.Config;
 import org.eclipse.microprofile.config.spi.ConfigSource;
 
 public abstract class AbstractConfigSource implements ConfigSource {
@@ -22,7 +21,6 @@ public abstract class AbstractConfigSource implements ConfigSource {
 	};
 
 	private final Set<String> skipped = new HashSet<>();
-	private Config config;
 
 	protected final void skip(String name, String... names) {
 		this.skipped.add(name);
@@ -79,22 +77,6 @@ public abstract class AbstractConfigSource implements ConfigSource {
 			return this.skipped.contains(propertyName) ? null : value(propertyName);
 		} finally {
 			RECURSIVE.remove();
-		}
-	}
-
-	protected final Config config() {
-		if (this.config != null) {
-			return this.config;
-		}
-
-		synchronized (this) {
-			if (this.config != null) {
-				return this.config;
-			}
-
-			this.config = ConfigUtil.getConfig();
-
-			return this.config;
 		}
 	}
 

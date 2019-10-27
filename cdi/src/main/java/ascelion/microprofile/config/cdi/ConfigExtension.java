@@ -30,7 +30,7 @@ import ascelion.cdi.bean.BeanAttributesModifier;
 import ascelion.cdi.metadata.AnnotatedTypeModifier;
 import ascelion.microprofile.config.ConfigValue;
 import ascelion.microprofile.config.eval.ExpressionConfig;
-import ascelion.microprofile.config.util.ConfigUtil;
+import ascelion.microprofile.config.util.ConfigInstance;
 
 import static java.util.stream.Collectors.toList;
 
@@ -48,9 +48,9 @@ public class ConfigExtension implements Extension {
 	}
 
 	@SuppressWarnings("unchecked")
-	<X> void collectConfigValues(BeanManager bm,
+	<X> void processConfigValue(BeanManager bm,
 			@Observes @WithAnnotations(ConfigValue.class) ProcessAnnotatedType<X> event) {
-		final ExpressionConfig expConfig = new ExpressionConfig(ConfigUtil.getConfig(bm));
+		final ExpressionConfig expConfig = new ExpressionConfig(ConfigInstance.get(bm));
 		final ConfigInject<X> inject = new ConfigInject<>(expConfig, event.getAnnotatedType());
 		final Set<ConfigValue> cvs = inject.values();
 
@@ -62,7 +62,7 @@ public class ConfigExtension implements Extension {
 			event.setAnnotatedType(type);
 
 			final List<AnnotatedMethod<? super X>> methods = type.getMethods().stream()
-					.filter(m -> m.isAnnotationPresent(ConfigSet.class))
+					.filter(m -> m.isAnnotationPresent(Setter.class))
 					.collect(toList());
 
 			if (methods.size() > 0) {
@@ -75,9 +75,9 @@ public class ConfigExtension implements Extension {
 		final InjectionPoint ijp = event.getInjectionPoint();
 
 		if (ijp.getAnnotated().isAnnotationPresent(ConfigValue.class)) {
-			LOG.debug("Need to produce: {}", ijp.getType());
-
-			this.types.add(ijp.getType());
+			if (this.types.add(ijp.getType())) {
+				LOG.debug("Need to create @ConfigValue producer for {}", ijp.getType());
+			}
 		}
 	}
 

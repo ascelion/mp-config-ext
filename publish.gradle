@@ -1,50 +1,83 @@
 apply plugin: 'maven-publish'
 
-def doPublish  = project.hasProperty( 'doPublish' )
+def forPublic  = project.hasProperty( 'forPublic' ) && project.getProperty( 'forPublic' )
+
+def isSnapshot = rootProject.version.endsWith( '-SNAPSHOT' )
+def isRelease  = !isSnapshot
 
 def signKey    = "${publishName}.sign.keyId"
 def signSecret = "${publishName}.sign.keySecret"
 def bintrayUSR = "${publishName}.bintray.username"
 def bintrayPWD = "${publishName}.bintray.password"
 
-def gext       = gradle.ext
+def isBomOnly  = true
 
-task sourcesJar(type: Jar) {
-	from sourceSets.main.allJava
-	classifier = 'sources'
+plugins.withType( JavaPlugin ) {
+	isBomOnly = false
+
+	task sourcesJar(type: Jar) {
+		from sourceSets.main.allJava
+
+		classifier = 'sources'
+	}
+
+	task javadocJar(type: Jar) {
+		from javadoc
+
+		classifier = 'javadoc'
+	}
+
+	javadoc {
+		failOnError = true
+
+		options {
+			source = sourceCompatibility
+			memberLevel = 'PROTECTED'
+
+			String javaApi = "https://docs.oracle.com/javase/${source.replace('1.', '')}/docs/api"
+
+			links += [ javaApi ]
+		}
+	}
 }
 
-task javadocJar(type: Jar) {
-	from javadoc
-	classifier = 'javadoc'
-}
-
-javadoc {
-	failOnError = true
-
-	options {
-		source = sourceCompatibility
-		memberLevel = 'PROTECTED'
-		//overview = file( 'src/main/java/overview.html' )
-		links += ['https://docs.oracle.com/javase/8/docs/api']
+if( isRelease ) {
+	tasks.withType( Jar ) {
+		manifest {
+			attributes(
+					'Built-By'       : 'ascelion',
+					'Build-Timestamp': new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ").format(new Date()),
+					'Build-Branch'   : scmVersion.scmPosition.branch,
+					'Build-Commit'   : scmVersion.scmPosition.revision,
+					'Build-Revision' : "${scmVersion.version}-${scmVersion.scmPosition.shortRevision}",
+					'Created-By'     : "Gradle ${gradle.gradleVersion}",
+					'Build-Jdk'      : "${System.properties['java.version']} (${System.properties['java.vendor']} ${System.properties['java.vm.version']})",
+					'Build-OS'       : "${System.properties['os.name']} ${System.properties['os.arch']} ${System.properties['os.version']}"
+					)
+		}
 	}
 }
 
 publishing {
 	publications {
 		maven( MavenPublication ) {
-			from components.java
-
-			artifact sourcesJar
-			artifact javadocJar
-
+			plugins.withType( JavaPlugin ) {
+				from components.java
+	
+				artifact sourcesJar
+				artifact javadocJar
+			}
+			plugins.withType( DistributionPlugin ) {
+				artifact distTar
+				artifact distZip
+			}
 			pom {
 				name = artifactId
-				url = "https://github.com/ascelion/${publishName}"
+				url = "${publishBase}/${publishName}"
 				scm {
-					url = "https://github.com/ascelion/${publishName}"
-					connection = "https://github.com/ascelion/${publishName}.git"
-					developerConnection = "git@github.com:ascelion/${publishName}.git"
+					url = "${publishBase}/${publishName}"
+					connection = "${publishBase}/${publishName}.git"
+					developerConnection = "${publishRepo}/${publishName}.git"
 				}
 				licenses {
 					license {
@@ -55,36 +88,51 @@ publishing {
 				}
 				withXml {
 					def xml = it.asNode()
-					def dm = xml.dependencyManagement.dependencies
-					def dd = xml.dependencies
 
-					dd.'*'
-						.findAll { node -> node.version.text() == '' }
-						.each { node ->
-							def dep =  dm.'*'.find {
-								node.groupId.text() == it.groupId.text() &&
-								node.artifactId.text() == it.artifactId.text() &&
-								node.classifier.text() == it.classifier.text()
+					if( isBomOnly ) {
+						def dm = xml.appendNode( 'dependencyManagement' ).appendNode( 'dependencies' )
+
+						rootProject.subprojects { sub ->
+							plugins.withType( MavenPublishPlugin ) {
+								def dep = dm.appendNode 'dependency'
+
+								dep.appendNode 'groupId', sub.group
+								dep.appendNode 'artifactId', sub.name
+								dep.appendNode 'version', sub.version
 							}
-	
-							node.appendNode( 'version', dep.version.text() )
 						}
+					} else {
+						def dm = xml.dependencyManagement.dependencies
+						def dd = xml.dependencies
 
-					xml.remove xml.dependencyManagement
+						dd.'*'
+								.findAll { node -> node.version.text() == '' }
+								.each { node ->
+									def dep =  dm.'*'.find {
+										node.groupId.text() == it.groupId.text() &&
+												node.artifactId.text() == it.artifactId.text() &&
+												node.classifier.text() == it.classifier.text()
+									}
+
+									node.appendNode( 'version', dep.version.text() )
+								}
+
+						xml.remove xml.dependencyManagement
+					}
 				}
 			}
 		}
 	}
 
-	if( doPublish && gradle.hasProperty( bintrayUSR ) ) {
+	if( forPublic && gradle.hasProperty( bintrayUSR ) ) {
 		repositories {
 			maven {
 				name = 'jfrog'
 				url = "https://oss.jfrog.org/artifactory/oss-${isSnapshot ? 'snapshot' : 'release'}-local"
 
 				credentials {
-					username = gext[bintrayUSR]
-					password = gradle.decryptPassword( gext[bintrayPWD] )
+					username = gradle.getProperty( bintrayUSR )
+					password = gradle.decryptPassword( gradle.getProperty( bintrayPWD ) )
 				}
 			}
 		}
@@ -94,10 +142,36 @@ publishing {
 if( gradle.hasProperty( signKey ) ) {
 	apply plugin: 'signing'
 
-	ext['signing.gnupg.keyName'] = gext[signKey]
+	ext['signing.gnupg.keyName'] = gradle.getProperty( signKey )
 
 	signing {
 		useGpgCmd()
 		sign publishing.publications.maven
+	}
+}
+
+if( isRelease && forPublic && gradle.hasProperty( bintrayUSR ) ) {
+	apply plugin: 'com.jfrog.bintray'
+
+	bintray {
+		user = gradle.getProperty( bintrayUSR )
+		key = gradle.decryptPassword( gradle.getProperty( bintrayPWD ) )
+
+		publications = ['maven']
+
+		pkg {
+			repo = 'repo'
+			userOrg = 'ascelion'
+			name = publishName
+			licenses = ['AGPL-3.0']
+			vcsUrl = "${publishBase}/${publishName}"
+			version {
+				name = rootProject.version
+
+				gpg {
+					sign = true
+				}
+			}
+		}
 	}
 }

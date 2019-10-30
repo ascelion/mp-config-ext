@@ -4,6 +4,7 @@ import javax.inject.Inject;
 
 import ascelion.microprofile.config.ConfigValue;
 
+import static ascelion.microprofile.config.cdi.WeldRule.createWeldRule;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 
@@ -12,7 +13,7 @@ import org.junit.Rule;
 import org.junit.Test;
 
 public class SetterTest {
-	static public class Bean {
+	static class Bean {
 		boolean configureCalled;
 		boolean definedCalled;
 		boolean undefinedCalled;
@@ -32,14 +33,7 @@ public class SetterTest {
 	}
 
 	@Rule
-	public WeldInitiator weld = WeldInitiator
-			.from(
-					ascelion.microprofile.config.cdi.ConfigExtension.class,
-					io.smallrye.config.inject.ConfigExtension.class,
-//					org.apache.geronimo.config.cdi.ConfigExtension.class,
-					Bean.class)
-			.inject(this)
-			.build();
+	public WeldInitiator weld = createWeldRule(this, Bean.class);
 
 	@Inject
 	private Bean bean;

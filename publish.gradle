@@ -1,6 +1,7 @@
 apply plugin: 'maven-publish'
 
-def forPublic  = project.hasProperty( 'forPublic' ) && project.getProperty( 'forPublic' )
+def forPublic  = project.hasProperty( 'forPublic' ) &&
+		(project.getProperty( 'forPublic' ) == '' || project.getProperty( 'forPublic' ) )
 
 def isSnapshot = rootProject.version.endsWith( '-SNAPSHOT' )
 def isRelease  = !isSnapshot
@@ -36,7 +37,7 @@ plugins.withType( JavaPlugin ) {
 
 			String javaApi = "https://docs.oracle.com/javase/${source.replace('1.', '')}/docs/api"
 
-			links += [ javaApi ]
+			links += [javaApi]
 		}
 	}
 }
@@ -63,7 +64,7 @@ publishing {
 		maven( MavenPublication ) {
 			plugins.withType( JavaPlugin ) {
 				from components.java
-	
+
 				artifact sourcesJar
 				artifact javadocJar
 			}
@@ -103,21 +104,24 @@ publishing {
 						}
 					} else {
 						def dm = xml.dependencyManagement.dependencies
-						def dd = xml.dependencies
 
-						dd.'*'
-								.findAll { node -> node.version.text() == '' }
-								.each { node ->
-									def dep =  dm.'*'.find {
-										node.groupId.text() == it.groupId.text() &&
-												node.artifactId.text() == it.artifactId.text() &&
-												node.classifier.text() == it.classifier.text()
+						if( dm.size() > 0 ) {
+							def dd = xml.dependencies
+
+							dd.'*'
+									.findAll { node -> node.version.text() == '' }
+									.each { node ->
+										def dep =  dm.'*'.find {
+											node.groupId.text() == it.groupId.text() &&
+													node.artifactId.text() == it.artifactId.text() &&
+													node.classifier.text() == it.classifier.text()
+										}
+
+										node.appendNode( 'version', dep.version.text() )
 									}
 
-									node.appendNode( 'version', dep.version.text() )
-								}
-
-						xml.remove xml.dependencyManagement
+							xml.remove xml.dependencyManagement
+						}
 					}
 				}
 			}
@@ -131,8 +135,8 @@ publishing {
 				url = "https://oss.jfrog.org/artifactory/oss-${isSnapshot ? 'snapshot' : 'release'}-local"
 
 				credentials {
-					username = gradle.getProperty( bintrayUSR )
-					password = gradle.decryptPassword( gradle.getProperty( bintrayPWD ) )
+					username = gradle.ext.getProperty( bintrayUSR )
+					password = gradle.decryptPassword( gradle.ext.getProperty( bintrayPWD ) )
 				}
 			}
 		}
@@ -142,7 +146,7 @@ publishing {
 if( gradle.hasProperty( signKey ) ) {
 	apply plugin: 'signing'
 
-	ext['signing.gnupg.keyName'] = gradle.getProperty( signKey )
+	ext['signing.gnupg.keyName'] = gradle.ext.getProperty( signKey )
 
 	signing {
 		useGpgCmd()
@@ -154,8 +158,8 @@ if( isRelease && forPublic && gradle.hasProperty( bintrayUSR ) ) {
 	apply plugin: 'com.jfrog.bintray'
 
 	bintray {
-		user = gradle.getProperty( bintrayUSR )
-		key = gradle.decryptPassword( gradle.getProperty( bintrayPWD ) )
+		user = gradle.ext.getProperty( bintrayUSR )
+		key = gradle.decryptPassword( gradle.ext.getProperty( bintrayPWD ) )
 
 		publications = ['maven']
 

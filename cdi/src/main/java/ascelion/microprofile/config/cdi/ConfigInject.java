@@ -2,7 +2,9 @@ package ascelion.microprofile.config.cdi;
 
 import java.beans.Introspector;
 import java.lang.reflect.Executable;
+import java.lang.reflect.Field;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Set;
 
@@ -10,6 +12,7 @@ import javax.enterprise.inject.Produces;
 import javax.enterprise.inject.literal.InjectLiteral;
 import javax.enterprise.inject.spi.AnnotatedCallable;
 import javax.enterprise.inject.spi.AnnotatedField;
+import javax.enterprise.inject.spi.AnnotatedMethod;
 import javax.enterprise.inject.spi.AnnotatedParameter;
 import javax.enterprise.inject.spi.AnnotatedType;
 import javax.enterprise.inject.spi.DeploymentException;
@@ -22,41 +25,57 @@ import ascelion.microprofile.config.ConfigValue;
 import ascelion.microprofile.config.eval.ExpressionConfig;
 
 import static java.lang.String.format;
+import static java.util.Collections.newSetFromMap;
+import static java.util.Collections.unmodifiableSet;
 import static java.util.Optional.ofNullable;
 
+import org.eclipse.microprofile.config.Config;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 final class ConfigInject<T> {
 	static private final Logger LOG = LoggerFactory.getLogger(ConfigInject.class);
 
-	private final ExpressionConfig subConfig;
-	private final AnnotatedTypeModifier<T> mod;
+	private final ExpressionConfig config;
+	private final AnnotatedTypeModifier<T> tmod;
 	private final String prefix;
+	private final String typeName;
+	private final boolean hasPrefix;
+
 	private final Set<ConfigValue> values = new HashSet<>();
 
-	private final String typeName;
+	private final Set<AnnotatedMethod<T>> methods = newSetFromMap(new IdentityHashMap<>());
+	private final Set<AnnotatedField<T>> fields = newSetFromMap(new IdentityHashMap<>());
 
-	ConfigInject(ExpressionConfig subConfig, AnnotatedType<T> type) {
-		this.subConfig = subConfig;
+	ConfigInject(Config config, AnnotatedType<T> type) {
+		this.config = new ExpressionConfig(config);
+		this.tmod = AnnotatedTypeModifier.create(type);
 		this.typeName = type.getJavaClass().getCanonicalName();
-		this.mod = AnnotatedTypeModifier.create(type);
 		this.prefix = ofNullable(type.getAnnotation(ConfigPrefix.class))
 				.map(ConfigPrefix::value)
 				.orElse(null);
+		this.hasPrefix = this.prefix != null && this.prefix.length() > 0;
 	}
 
 	Set<ConfigValue> values() {
 		if (this.values.isEmpty()) {
-			processCallables(this.mod.getCallables());
-			processFields(this.mod.getFields());
+			processCallables(this.tmod.getCallables());
+			processFields(this.tmod.getFields());
 		}
 
 		return this.values;
 	}
 
 	AnnotatedType<T> type() {
-		return this.mod.get();
+		return this.tmod.get();
+	}
+
+	Set<AnnotatedField<T>> fields() {
+		return unmodifiableSet(this.fields);
+	}
+
+	Set<AnnotatedMethod<T>> methods() {
+		return unmodifiableSet(this.methods);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -75,65 +94,71 @@ final class ConfigInject<T> {
 		if (parameters.size() == 1) {
 			final AnnotatedParameter<? super T> parameter = parameters.get(0);
 			final ConfigValue cval = parameter.getAnnotation(ConfigValue.class);
-			final Modifier<T> mod = this.mod.executableParam(executable, 0);
+			final Modifier<T> pmod = this.tmod.executableParam(executable, 0);
 			String name = executable.getName();
 
 			if (name.startsWith("set")) {
 				if (cval.required()) {
-					this.mod.executable(executable)
+					this.tmod.executable(executable)
 							.add(InjectLiteral.INSTANCE);
 				} else {
-					this.mod.executable(executable)
-							.remove(Inject.class)
-							.add(Setter.INSTANCE);
+					this.tmod.executable(executable)
+							.remove(Inject.class);
 
 					LOG.debug("Removing injection from setter in {}", executable);
 				}
 
+				this.methods.add((AnnotatedMethod<T>) callable);
+
 				name = Introspector.decapitalize(name.substring(3));
 			} else {
-				this.mod.executable(executable)
+				this.tmod.executable(executable)
 						.add(InjectLiteral.INSTANCE);
 			}
 
-			updateAnnotation(cval, mod, name);
+			updateAnnotation(cval, pmod, name);
 		} else {
+			this.tmod.executable(executable)
+					.add(InjectLiteral.INSTANCE);
+
 			for (int k = 0; k < parameters.size(); k++) {
 				final AnnotatedParameter<? super T> parameter = parameters.get(k);
 
 				if (parameter.isAnnotationPresent(ConfigValue.class)) {
 					final ConfigValue cval = parameter.getAnnotation(ConfigValue.class);
-					final Modifier<T> mod = this.mod.executableParam(executable, k);
+					final Modifier<T> pmod = this.tmod.executableParam(executable, k);
 
-					updateAnnotation(cval, mod, "");
+					updateAnnotation(cval, pmod, "");
 				}
 			}
-
-			this.mod.executable(executable)
-					.add(InjectLiteral.INSTANCE);
 		}
 	}
 
+	@SuppressWarnings("unchecked")
 	private void processFields(Set<AnnotatedField<? super T>> fields) {
 		fields.stream()
 				.filter(field -> !field.isAnnotationPresent(Produces.class))
 				.filter(field -> field.isAnnotationPresent(ConfigValue.class))
-				.forEach(field -> processField(field));
+				.forEach(field -> processField((AnnotatedField<T>) field));
 	}
 
-	private void processField(AnnotatedField<? super T> annotated) {
-		final Modifier<T> fmod = this.mod.field(annotated);
-
-		fmod.add(InjectLiteral.INSTANCE);
-
+	private void processField(AnnotatedField<T> annotated) {
 		final ConfigValue cval = annotated.getAnnotation(ConfigValue.class);
+		final Modifier<T> fmod = this.tmod.field(annotated);
+		final Field field = annotated.getJavaMember();
 
-		updateAnnotation(cval, fmod, annotated.getJavaMember().getName());
+		if (cval.required()) {
+			fmod.add(InjectLiteral.INSTANCE);
+		}
+
+		this.fields.add(annotated);
+
+		updateAnnotation(cval, fmod, field.getName());
 	}
 
 	private ConfigValue updateAnnotation(ConfigValue cval, Modifier<T> amod, String name) {
 		final String prop = cval.value();
-		final int varIx = this.subConfig.variableIndex(prop);
+		final int varIx = this.config.variableIndex(prop);
 
 		amod.remove(ConfigValue.class);
 
@@ -143,11 +168,12 @@ final class ConfigInject<T> {
 			if (name.isEmpty()) {
 				throw new DeploymentException(format("Configuration name is required for %s", amod.and().get()));
 			}
-			if (varIx < 0) {
-				if (this.prefix == null) {
-					expr.append(this.typeName);
-				} else {
+
+			if (varIx < 0 && cval.usePrefix()) {
+				if (this.hasPrefix) {
 					expr.append(this.prefix);
+				} else {
+					expr.append(this.typeName);
 				}
 
 				expr.append(".");
@@ -155,7 +181,7 @@ final class ConfigInject<T> {
 
 			expr.append(name);
 		} else {
-			if (varIx < 0 && this.prefix != null) {
+			if (varIx < 0 && cval.usePrefix() && this.hasPrefix) {
 				expr.append(this.prefix);
 				expr.append(".");
 			}
@@ -163,18 +189,13 @@ final class ConfigInject<T> {
 			expr.append(prop);
 		}
 
-		if (varIx < 0) {
-			expr.insert(0, this.subConfig.getVarPrefix());
-			expr.append(this.subConfig.getVarSuffix());
-		}
-
-		cval = new ConfigValueLiteral(expr.toString(), cval.required());
+		cval = new ConfigValueLiteral(expr.toString(), cval);
 
 		this.values.add(cval);
 
 		amod.add(cval);
 
-		LOG.debug("Set {} to {}", expr, amod.and().get());
+		LOG.debug("Set {} to {}", expr, amod);
 
 		return cval;
 	}

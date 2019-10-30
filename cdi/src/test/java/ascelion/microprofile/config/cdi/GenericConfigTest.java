@@ -4,6 +4,7 @@ import javax.inject.Inject;
 
 import ascelion.microprofile.config.ConfigValue;
 
+import static ascelion.microprofile.config.cdi.WeldRule.createWeldRule;
 import static org.hamcrest.Matchers.equalTo;
 import static org.junit.Assert.assertThat;
 
@@ -28,13 +29,7 @@ public class GenericConfigTest {
 	}
 
 	@Rule
-	public WeldInitiator weld = WeldInitiator
-			.from(
-					ascelion.microprofile.config.cdi.ConfigExtension.class,
-					io.smallrye.config.inject.ConfigExtension.class,
-//					org.apache.geronimo.config.cdi.ConfigExtension.class,
-					GenericInteger.class, GenericLong.class, GenericString.class)
-			.inject(this).build();
+	public WeldInitiator weld = createWeldRule(this, GenericInteger.class, GenericLong.class, GenericString.class);
 
 	@Inject
 	private GenericInteger gInteger;

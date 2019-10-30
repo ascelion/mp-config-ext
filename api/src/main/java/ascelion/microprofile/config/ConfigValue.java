@@ -12,7 +12,12 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Retention(RUNTIME)
 @Target({ METHOD, FIELD, PARAMETER, TYPE })
 public @interface ConfigValue {
+
 	String value() default "";
 
+	boolean usePrefix() default true;
+
 	boolean required() default true;
+
+	Class<?> type() default Object.class;
 }

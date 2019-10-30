@@ -5,6 +5,7 @@ import javax.inject.Inject;
 import ascelion.microprofile.config.ConfigPrefix;
 import ascelion.microprofile.config.ConfigValue;
 
+import static ascelion.microprofile.config.cdi.WeldRule.createWeldRule;
 import static org.hamcrest.Matchers.equalTo;
 import static org.junit.Assert.assertThat;
 
@@ -19,24 +20,18 @@ public class NestedValueTest {
 		@ConfigValue
 		int position;
 
+		@ConfigValue("${nested.value}")
+		int value;
+
 		@ConfigValue
 		int value1;
 
 		@ConfigValue
 		int value2;
-
-		@ConfigValue("${nested.value}")
-		int value;
 	}
 
 	@Rule
-	public WeldInitiator weld = WeldInitiator
-			.from(
-					ascelion.microprofile.config.cdi.ConfigExtension.class,
-					io.smallrye.config.inject.ConfigExtension.class,
-//					org.apache.geronimo.config.cdi.ConfigExtension.class,
-					Nested.class)
-			.inject(this).build();
+	public WeldInitiator weld = createWeldRule(this, Nested.class);
 
 	@Inject
 	private Nested nested;
@@ -44,8 +39,8 @@ public class NestedValueTest {
 	@Test
 	public void run() {
 		assertThat(this.nested.position, equalTo(1));
+		assertThat(this.nested.value, equalTo(this.nested.value1));
 		assertThat(this.nested.value1, equalTo(2));
 		assertThat(this.nested.value2, equalTo(3));
-		assertThat(this.nested.value, equalTo(this.nested.value1));
 	}
 }
